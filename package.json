@@ -1,0 +1,30 @@
+{
+  "name": "chosee-vpn-bot",
+  "version": "1.0.0",
+  "description": "Telegram Bot & Mini App for Xray/VLESS-Reality VPN Management via 3X-UI",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "vpn",
+    "telegram-bot",
+    "telegram-mini-app",
+    "vless",
+    "reality",
+    "xray",
+    "3x-ui"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "grammy": "^1.23.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
+    "ssh2": "^1.17.0"
+  }
+}

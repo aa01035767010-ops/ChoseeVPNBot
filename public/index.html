@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ChoseeVPN Personal Cabinet</title>
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- HEADER / USER CARD -->
+    <header class="user-header">
+      <div class="user-info">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-meta">
+          <h1 class="user-name" id="user-name">Загрузка...</h1>
+          <p class="user-handle" id="user-handle">@username</p>
+        </div>
+      </div>
+      <div class="status-badge active" id="subscription-status">Активен</div>
+    </header>
+
+    <!-- BALANCE CONTAINER -->
+    <section class="balance-card">
+      <div class="balance-info">
+        <span class="balance-label">Текущий баланс</span>
+        <h2 class="balance-amount" id="balance-val">0.00 ₽</h2>
+      </div>
+      <button class="btn btn-primary" id="open-topup-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="icon">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Пополнить
+      </button>
+    </section>
+
+    <!-- NAVIGATION TABS -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="devices-tab">Устройства</button>
+      <button class="tab-btn" data-tab="help-tab">Инструкция</button>
+    </nav>
+
+    <!-- TABS CONTENT -->
+    <main class="tabs-content">
+      
+      <!-- DEVICES TAB -->
+      <div class="tab-pane active" id="devices-tab">
+        <div class="section-header">
+          <h3>Мои устройства</h3>
+          <button class="btn btn-secondary btn-sm" id="open-add-device-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="icon-sm">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Добавить
+          </button>
+        </div>
+
+        <!-- Devices List -->
+        <div class="devices-list" id="devices-list-container">
+          <!-- Loading state -->
+          <div class="loading-state">Загрузка устройств...</div>
+        </div>
+      </div>
+
+      <!-- HELP & INSTRUCTIONS TAB -->
+      <div class="tab-pane" id="help-tab">
+        <div class="faq-section">
+          <h3>Как подключить VPN?</h3>
+          
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h4>Скачайте приложение-клиент</h4>
+              <p>Установите программу для импорта VLESS-ключей на ваше устройство:</p>
+              <div class="client-links">
+                <a href="https://play.google.com/store/apps/details?id=com.v2ray.ang" target="_blank" class="client-link-btn">
+                  <span>Android (v2rayNG)</span>
+                </a>
+                <a href="https://apps.apple.com/app/foxray/id6444878719" target="_blank" class="client-link-btn">
+                  <span>iOS / macOS (FoXray)</span>
+                </a>
+                <a href="https://apps.apple.com/app/streisand/id6450534064" target="_blank" class="client-link-btn">
+                  <span>iOS Альтернатива (Streisand)</span>
+                </a>
+                <a href="https://github.com/2dust/v2rayN/releases" target="_blank" class="client-link-btn">
+                  <span>Windows (v2rayN)</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h4>Скопируйте ключ</h4>
+              <p>Перейдите на вкладку «Устройства» и нажмите синюю кнопку копирования ключа (`vless://...`) для нужного девайса.</p>
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h4>Импортируйте ключ и подключитесь</h4>
+              <p>Откройте скачанное приложение:</p>
+              <ul>
+                <li>В <strong>v2rayNG</strong>: Нажмите на ➕ сверху -> Выберите «Импорт профиля из буфера обмена» -> Нажмите круглую кнопку с логотипом V внизу для запуска.</li>
+                <li>В <strong>FoXray / Streisand</strong>: Нажмите кнопку импорта/добавления -> Выберите импорт из буфера обмена (Clipboard) -> Активируйте соединение переключателем.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- NATIVE MODAL: ADD DEVICE -->
+  <dialog class="flat-modal" id="add-device-dialog">
+    <div class="modal-content">
+      <h3>Новое устройство</h3>
+      <p class="modal-description">Придумайте понятное название для ключа доступа, например: <em>Мой iPhone</em> или <em>Рабочий ПК</em>.</p>
+      
+      <form method="dialog" id="add-device-form">
+        <div class="form-group">
+          <label for="device-name-input">Название устройства</label>
+          <input type="text" id="device-name-input" placeholder="Например: iPhone XS" autocomplete="off" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-flat" id="close-add-dialog-btn">Отмена</button>
+          <button type="submit" class="btn btn-primary" id="submit-device-btn">Создать ключ</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- NATIVE MODAL: TOP-UP BALANCE -->
+  <dialog class="flat-modal" id="topup-dialog">
+    <div class="modal-content">
+      <h3>Пополнение баланса</h3>
+      <p class="modal-description">Выберите сумму или введите свою. Оплата производится в тестовом симуляционном режиме.</p>
+      
+      <div class="quick-amounts">
+        <button class="amount-card" data-val="100">100 ₽</button>
+        <button class="amount-card active" data-val="250">250 ₽</button>
+        <button class="amount-card" data-val="500">500 ₽</button>
+        <button class="amount-card" data-val="1000">1000 ₽</button>
+      </div>
+
+      <div class="form-group">
+        <label for="custom-amount-input">Своя сумма (₽)</label>
+        <input type="number" id="custom-amount-input" placeholder="Введите сумму" min="10" max="10000" value="250">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-flat" id="close-topup-dialog-btn">Отмена</button>
+        <button class="btn btn-primary" id="checkout-btn">Оплатить</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- NATIVE MODAL: SIMULATE CHECKOUT -->
+  <dialog class="flat-modal" id="checkout-dialog">
+    <div class="modal-content">
+      <div class="payment-title-group">
+        <span class="payment-shield-icon">🛡️</span>
+        <h3>Безопасная оплата</h3>
+      </div>
+      <p class="modal-description">Имитация платежного шлюза стороннего сервиса. Подтвердите платеж для моментального зачисления средств.</p>
+      
+      <div class="checkout-summary">
+        <span class="summary-label">Сумма к оплате:</span>
+        <span class="summary-value" id="checkout-sum-val">250.00 ₽</span>
+      </div>
+
+      <div class="modal-actions full-width">
+        <button class="btn btn-primary" id="confirm-payment-btn">Подтвердить платеж (Симуляция)</button>
+        <button class="btn btn-flat" id="cancel-payment-btn">Отмена</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- JavaScript file -->
+  <script src="app.js"></script>
+</body>
+</html>

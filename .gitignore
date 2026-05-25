@@ -1,0 +1,25 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local environment and private credentials
+.env
+.env.local
+.env.production
+.env.development
+vps-credentials.json
+bothost-credentials.json
+
+# Local SQLite databases containing private user info & billing balances
+*.sqlite
+*.sqlite3
+database.sqlite
+database.sqlite-journal
+
+# System logs and temporary files
+.DS_Store
+.idea/
+.vscode/
+*.log
