@@ -1,5 +1,10 @@
 import { config } from './config.js';
 
+// Disable TLS verification for self-signed certificates in panel connections if HTTPS is used
+if (!config.mockMode && config.xui.url.startsWith('https:')) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 console.log('🔍 Testing connection to your Telegram Bot and VPS 3X-UI Panel...\n');
 
 async function testTelegramBot() {
@@ -50,44 +55,54 @@ async function testXuiPanel() {
     return false;
   }
 
-  // 2. Try to login
-  let sessionCookie = null;
-  try {
-    const loginUrl = `${baseUrl}/login`;
-    console.log(`🔑 Attempting admin login as: "${config.xui.username}"...`);
-    const loginRes = await fetch(loginUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        username: config.xui.username,
-        password: config.xui.password,
-      }),
-    });
+  const headers = {
+    'Accept': 'application/json'
+  };
 
-    if (!loginRes.ok) {
-      console.error(`❌ 3X-UI Panel: Login request failed with status ${loginRes.status}.`);
-      return false;
-    }
+  // 2. Perform authentication check
+  if (config.xui.apiToken) {
+    console.log(`🔑 Using API Bearer Token for authorization: "${config.xui.apiToken.substring(0, 10)}..."`);
+    headers['Authorization'] = `Bearer ${config.xui.apiToken}`;
+  } else {
+    let sessionCookie = null;
+    try {
+      const loginUrl = `${baseUrl}/login`;
+      console.log(`🔑 Attempting admin login as: "${config.xui.username}"...`);
+      const loginRes = await fetch(loginUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          username: config.xui.username,
+          password: config.xui.password,
+        }),
+      });
 
-    const data = await loginRes.json();
-    if (data && data.success) {
-      const setCookie = loginRes.headers.get('set-cookie');
-      if (setCookie) {
-        sessionCookie = setCookie.split(';')[0];
-        console.log('✅ 3X-UI Panel: Login successful!');
-      } else {
-        console.error('❌ 3X-UI Panel: Login succeeded but no session cookie was returned.');
+      if (!loginRes.ok) {
+        console.error(`❌ 3X-UI Panel: Login request failed with status ${loginRes.status}.`);
         return false;
       }
-    } else {
-      console.error(`❌ 3X-UI Panel: Login failed. Reason: ${data?.msg || 'Invalid credentials'}`);
+
+      const data = await loginRes.json();
+      if (data && data.success) {
+        const setCookie = loginRes.headers.get('set-cookie');
+        if (setCookie) {
+          sessionCookie = setCookie.split(';')[0];
+          console.log('✅ 3X-UI Panel: Login successful!');
+          headers['Cookie'] = sessionCookie;
+        } else {
+          console.error('❌ 3X-UI Panel: Login succeeded but no session cookie was returned.');
+          return false;
+        }
+      } else {
+        console.error(`❌ 3X-UI Panel: Login failed. Reason: ${data?.msg || 'Invalid credentials'}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`❌ 3X-UI Panel: Error during login request: ${error.message}`);
       return false;
     }
-  } catch (error) {
-    console.error(`❌ 3X-UI Panel: Error during login request: ${error.message}`);
-    return false;
   }
 
   // 3. Check Inbound Configuration
@@ -96,10 +111,7 @@ async function testXuiPanel() {
     const getInboundUrl = `${baseUrl}/panel/api/inbounds/get/${config.xui.inboundId}`;
     const response = await fetch(getInboundUrl, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Cookie': sessionCookie
-      }
+      headers: headers
     });
 
     if (!response.ok) {
@@ -114,7 +126,7 @@ async function testXuiPanel() {
       console.log(`   Protocol: ${inbound.protocol.toUpperCase()}`);
       console.log(`   Port: ${inbound.port}`);
       
-      const streamSettings = JSON.parse(inbound.streamSettings);
+      const streamSettings = typeof inbound.streamSettings === 'string' ? JSON.parse(inbound.streamSettings) : inbound.streamSettings;
       console.log(`   Security Mode: ${streamSettings.security || 'none'}`);
       
       if (inbound.protocol.toLowerCase() !== 'vless') {

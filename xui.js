@@ -56,17 +56,20 @@ async function login() {
 async function apiCall(path, method = 'GET', body = null) {
   if (config.mockMode) return null;
 
-  if (!sessionCookie) {
-    await login();
-  }
-
   const url = `${config.xui.url.replace(/\/$/, '')}${path}`;
   const headers = {
     'Accept': 'application/json',
   };
 
-  if (sessionCookie) {
-    headers['Cookie'] = sessionCookie;
+  if (config.xui.apiToken) {
+    headers['Authorization'] = `Bearer ${config.xui.apiToken}`;
+  } else {
+    if (!sessionCookie) {
+      await login();
+    }
+    if (sessionCookie) {
+      headers['Cookie'] = sessionCookie;
+    }
   }
 
   let options = { method, headers };
@@ -79,8 +82,8 @@ async function apiCall(path, method = 'GET', body = null) {
   try {
     let response = await fetch(url, options);
 
-    // If 401 or redirect back to login, the session might have expired
-    if (response.status === 401 || response.url.endsWith('/login')) {
+    // If 401 or redirect back to login and we are using cookies, the session might have expired
+    if (!config.xui.apiToken && (response.status === 401 || response.url.endsWith('/login'))) {
       console.log('🔄 Session cookie expired. Re-authenticating...');
       await login();
       
@@ -121,32 +124,38 @@ export const xuiService = {
     }
 
     try {
-      // 1. Register Client in the Inbound via API
-      console.log(`📡 Adding VLESS Client on VPS: ${email}...`);
-      const response = await apiCall('/panel/api/inbounds/addClient', 'POST', {
-        id: config.xui.inboundId,
-        settings: JSON.stringify({
-          clients: [
-            {
-              id: clientUuid,
-              flow: 'xtls-rprx-vision',
-              email: email,
-              limitIp: 0,
-              totalGB: 0,
-              expiryTime: 0,
-              enable: true,
-              tgId: String(userId),
-              subId: ''
-            }
-          ]
-        })
+      // 1. Register Client via new v3 API
+      console.log(`📡 Adding VLESS Client on VPS in v3 format: ${email}...`);
+      const response = await apiCall('/panel/api/clients/add', 'POST', {
+        client: {
+          email: email,
+          uuid: clientUuid,
+          flow: 'xtls-rprx-vision',
+          enable: true
+        },
+        inboundIds: [config.xui.inboundId]
       });
 
       if (!response || !response.success) {
         throw new Error(response?.msg || 'Could not add client to panel');
       }
 
-      // 2. Fetch Inbound configuration details to dynamically build a fully working VLESS link
+      // 2. Fetch the newly created client's actual UUID from the VPS list
+      console.log(`📡 Resolving generated client details from VPS for email: ${email}...`);
+      const listRes = await apiCall('/panel/api/clients/list', 'GET');
+      if (!listRes || !listRes.success || !Array.isArray(listRes.obj)) {
+        throw new Error('Could not fetch clients list to resolve generated UUID');
+      }
+
+      const client = listRes.obj.find(c => c.email === email);
+      if (!client) {
+        throw new Error(`Client with email "${email}" was added but could not be found in list`);
+      }
+
+      const activeUuid = client.uuid || clientUuid;
+      console.log(`✅ Client UUID resolved on VPS: ${activeUuid}`);
+
+      // 3. Fetch Inbound configuration details to dynamically build a fully working VLESS link
       console.log(`📡 Fetching inbound configuration details (ID: ${config.xui.inboundId})...`);
       const inboundRes = await apiCall(`/panel/api/inbounds/get/${config.xui.inboundId}`, 'GET');
       
@@ -156,7 +165,7 @@ export const xuiService = {
 
       const inbound = inboundRes.obj;
       const port = inbound.port;
-      const streamSettings = JSON.parse(inbound.streamSettings);
+      const streamSettings = typeof inbound.streamSettings === 'string' ? JSON.parse(inbound.streamSettings) : inbound.streamSettings;
 
       // Parse VPS host domain or IP
       const vpsHost = config.xui.url.replace(/^https?:\/\//, '').split(':')[0];
@@ -169,10 +178,10 @@ export const xuiService = {
       const sid = streamSettings.realitySettings?.shortIds?.[0] || '';
 
       // Build precise VLESS link
-      const vlessLink = `vless://${clientUuid}@${vpsHost}:${port}?security=${security}&sni=${sni}&fp=${fp}&pbk=${pbk}&sid=${sid}&flow=xtls-rprx-vision#${encodeURIComponent(deviceName)}`;
+      const vlessLink = `vless://${activeUuid}@${vpsHost}:${port}?security=${security}&sni=${sni}&fp=${fp}&pbk=${pbk}&sid=${sid}&flow=xtls-rprx-vision#${encodeURIComponent(deviceName)}`;
 
-      console.log(`✅ Client created on VPS. Key: vless://${clientUuid.slice(0,8)}...`);
-      return { uuid: clientUuid, link: vlessLink };
+      console.log(`✅ Client created on VPS. Key: vless://${activeUuid.slice(0,8)}...`);
+      return { uuid: activeUuid, link: vlessLink };
 
     } catch (error) {
       console.error('❌ Failed to create VLESS client on 3X-UI VPS:', error.message);
@@ -192,21 +201,33 @@ export const xuiService = {
     }
 
     try {
-      console.log(`📡 Deleting client ${clientUuid} from inbound ${config.xui.inboundId}...`);
+      console.log(`📡 Searching for client email with UUID: ${clientUuid}...`);
       
-      // Standard 3X-UI client deletion endpoint: /panel/api/inbounds/client/{inboundId}/delete/{clientUuid}
-      const response = await apiCall(`/panel/api/inbounds/client/${config.xui.inboundId}/delete/${clientUuid}`, 'POST');
-
-      // Fallback endpoint if some panels use /panel/api/inbounds/delClient/{clientUuid}
-      if (!response || !response.success) {
-        console.warn('⚠️ Standard delete endpoint failed, trying fallback delClient...');
-        const fallbackRes = await apiCall(`/panel/api/inbounds/delClient/${clientUuid}`, 'POST');
-        if (!fallbackRes || !fallbackRes.success) {
-          throw new Error(fallbackRes?.msg || 'All deletion endpoints failed');
-        }
+      // 1. Fetch the list of all clients
+      const listRes = await apiCall('/panel/api/clients/list', 'GET');
+      if (!listRes || !listRes.success || !Array.isArray(listRes.obj)) {
+        throw new Error('Could not fetch clients list to resolve email');
       }
 
-      console.log(`✅ Client ${clientUuid} successfully deleted from VPS.`);
+      const clients = listRes.obj;
+      const client = clients.find(c => c.uuid === clientUuid);
+      
+      if (!client) {
+        console.warn(`⚠️ Client with UUID ${clientUuid} not found on VPS. Skipping deletion.`);
+        return true; // treat as success since it is already gone
+      }
+
+      const email = client.email;
+      console.log(`📡 Deleting client "${email}" from VPS...`);
+
+      // 2. Delete the client by email using the v3 endpoint
+      const response = await apiCall(`/panel/api/clients/del/${email}`, 'POST');
+
+      if (!response || !response.success) {
+        throw new Error(response?.msg || 'Failed to delete client');
+      }
+
+      console.log(`✅ Client "${email}" successfully deleted from VPS.`);
       return true;
     } catch (error) {
       console.error('❌ Failed to delete VLESS client from 3X-UI VPS:', error.message);

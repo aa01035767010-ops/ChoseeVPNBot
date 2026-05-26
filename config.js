@@ -9,6 +9,7 @@ export const config = {
     username: process.env.XUI_USERNAME || '',
     password: process.env.XUI_PASSWORD || '',
     inboundId: parseInt(process.env.XUI_INBOUND_ID || '1', 10),
+    apiToken: process.env.XUI_API_TOKEN || '',
   },
   mockMode: (process.env.MOCK_MODE || 'true').toLowerCase() === 'true',
   dbName: 'database.sqlite'
