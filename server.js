@@ -75,6 +75,22 @@ bot.command('help', async (ctx) => {
 
 // Run bot in the background
 if (config.botToken && config.botToken !== '123456789:AABBCCDDEEFFgg-hhiijjkkllmmnnooppqq') {
+  // Automatically configure Chat Menu Button
+  const miniAppUrl = process.env.WEBAPP_URL || '';
+  if (miniAppUrl.startsWith('https://')) {
+    bot.api.setChatMenuButton({
+      menu_button: {
+        type: 'web_app',
+        text: '💻 Кабинет',
+        web_app: { url: miniAppUrl }
+      }
+    }).then(() => {
+      console.log('✅ Chat Menu Button successfully configured.');
+    }).catch((err) => {
+      console.error('❌ Failed to set Chat Menu Button:', err.message);
+    });
+  }
+
   bot.start().catch((err) => {
     console.error('❌ Grammy bot failed to start:', err.message);
   });
