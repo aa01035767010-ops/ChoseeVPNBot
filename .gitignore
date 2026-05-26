@@ -23,3 +23,15 @@ database.sqlite-journal
 .idea/
 .vscode/
 *.log
+
+# Diagnostic, scraping, and Bothost local management scripts containing credentials
+bothost-*.js
+check-*.js
+fetch-*.js
+*.html
+*.zip
+*scraped.js
+dns-lookup.js
+get-menu-button*.js
+set-menu-button.js
+probe-add-payload.js
