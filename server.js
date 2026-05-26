@@ -42,10 +42,15 @@ bot.command('start', async (ctx) => {
       `🛡️ Этот протокол полностью устойчив к любым блокировкам провайдеров в РФ, так как маскирует трафик под посещение доверенных веб-ресурсов.\n\n` +
       `📱 Для управления устройствами, получения ключей доступа и пополнения баланса нажмите на кнопку ниже:`;
 
-    // Dynamic Mini App URL fallback
-    const miniAppUrl = process.env.WEBAPP_URL || `http://localhost:${config.port}`;
+    // Safe defensive check for valid HTTPS WebApp URL
+    let keyboard;
+    const miniAppUrl = process.env.WEBAPP_URL || '';
 
-    const keyboard = new InlineKeyboard().webApp('💻 Личный Кабинет', miniAppUrl);
+    if (miniAppUrl.startsWith('https://')) {
+      keyboard = new InlineKeyboard().webApp('💻 Личный Кабинет', miniAppUrl);
+    } else {
+      console.warn(`⚠️ Warning: WEBAPP_URL is not configured with a valid HTTPS address: "${miniAppUrl}". WebApp inline button is disabled.`);
+    }
 
     await ctx.reply(welcomeText, {
       parse_mode: 'Markdown',
